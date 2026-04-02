@@ -6,6 +6,44 @@ from datetime import datetime
 s3 = boto3.client('s3')
 
 def lambda_handler(event, context):
+    print("=== metadata extractor invoked ===")
+    for sns_record in event['Records']:
+        s3_event = json.loads(sns_record['Sns']['Message'])
+
+        for s3_record in s3_event['Records']:
+            bucket = s3_record['s3']['bucket']['name']
+            key = s3_record['s3']['object']['key']
+            size = s3_record['s3']['object']['size']
+            timestamp = s3_record['eventTime']
+
+            print(f"[METADATA] File: {key}")
+            print(f"[METADATA] Bucket: {bucket}")
+            print(f"[METADATA] Size: {size} bytes")
+            print(f"[METADATA] Upload Time: {timestamp}")
+
+            meta = {
+                "file": key,
+                "bucket": bucket,
+                "size": size,
+                "upload_time": timestamp
+            }
+
+            stem = os.path.splitext(key.split('/')[-1])[0]
+            s3.put_object(
+                Bucket=bucket,
+                Key=f"processed/metadata/{stem}.json",
+                Body=json.dumps(meta),
+                ContentType='application/json'
+            )
+    return {'statusCode': 200, 'body': 'metadata extracted'}
+
+
+
+
+
+
+
+
     """
     extracts metadata from S3 upload events received via SNS.
     logs file information to CloudWatch and writes a JSON metadata
@@ -36,8 +74,6 @@ def lambda_handler(event, context):
         }
     """
 
-    print("=== metadata extractor invoked ===")
-
     # todo: loop through event['Records']
     # todo: for each record, get the SNS message string from record['Sns']['Message']
     # todo: parse the SNS message string as JSON to get the S3 event
@@ -58,4 +94,3 @@ def lambda_handler(event, context):
     #       hint: s3.put_object(Bucket=bucket, Key=f"processed/metadata/{filename}.json",
     #             Body=json.dumps(metadata), ContentType='application/json')
 
-    return {'statusCode': 200, 'body': 'metadata extracted'}

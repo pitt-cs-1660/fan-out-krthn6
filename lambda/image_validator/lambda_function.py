@@ -12,6 +12,30 @@ def is_valid_image(key):
     return ext in VALID_EXTENSIONS
 
 def lambda_handler(event, context):
+    print("=== image validator invoked ===")
+
+    for msg in event['Records']:
+        payload = json.loads(msg['Sns']['Message'])
+
+        for rec in payload['Records']:
+            bucket = rec['s3']['bucket']['name']
+            key = rec['s3']['object']['key']
+
+            if is_valid_image(key):
+                print(f"[VALID] {key} is a valid image file")
+
+                name = key.split('/')[-1]
+                s3.copy_object(
+                    Bucket=bucket,
+                    Key=f"processed/valid/{name}",
+                    CopySource={'Bucket': bucket, 'Key': key}
+                )
+            else:
+                print(f"[INVALID] {key} is not a valid image type")
+                raise ValueError(f"{key} is not a valid image type")
+
+    return {'statusCode': 200, 'body': 'validation complete'}
+
     """
     validates that uploaded files are images.
     raises exception for invalid files (triggers DLQ).
@@ -39,7 +63,6 @@ def lambda_handler(event, context):
     important: to trigger the DLQ, you must raise an exception (not return an error).
     """
 
-    print("=== image validator invoked ===")
 
     # todo: loop through event['Records']
     # todo: for each record, get the SNS message string from record['Sns']['Message']
@@ -59,4 +82,3 @@ def lambda_handler(event, context):
     #         - print the [INVALID] message: print(f"[INVALID] {key} is not a valid image type")
     #         - raise ValueError to trigger DLQ
 
-    return {'statusCode': 200, 'body': 'validation complete'}
